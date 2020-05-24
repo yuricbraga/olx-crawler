@@ -1,29 +1,37 @@
 import scrapy
-from scrapy.crawler import CrawlerProcess
+from scrapy.crawler import CrawlerProcess, CrawlerRunner
 import argparse
 from urllib import parse
 from EmailController import EmailController
+from time import sleep
+from multiprocessing import Process, Queue
+from twisted.internet import reactor
+
+CAN_SEND_EMAIL = False
 
 class AdController:
-    def __init__(self, searchString):
-        self.searchString = searchString
+    def __init__(self, queryString):
+        self.queryString = queryString
+        self.adList = []
         self.adQuantity = 0
+        self.canSendEmail = False
 
-    def printParsed(self, parsed):
-        self.adQuantity = len(parsed)
-        self.adList = parsed
+    def append(self, item):
+        self.adQuantity += 1
+        self.adList.append(item)
+
+    def printParsed(self):
         print("Quantidade de anúncios: {}\n".format(self.adQuantity))
-        for ad in parsed:
+        for ad in self.adList:
             print(ad)
 
 class OlxScrape(scrapy.Spider):
     name = "olx"
-    test = None
 
-    def __init__(self, testObject=None, *args, **kwargs):
+    def __init__(self, adController=None, *args, **kwargs):
         super(OlxScrape, self).__init__(*args, **kwargs)
-        self.test = testObject
-        self.start_urls = ["https://m.olx.com.br/busca?ca=31_s&q={}&w=1".format(self.test.searchString)]
+        self.adController = adController
+        self.start_urls = ["https://m.olx.com.br/busca?ca=31_s&q={}&w=1".format(adController.queryString)]
 
 
     def start_requests(self):
@@ -32,11 +40,14 @@ class OlxScrape(scrapy.Spider):
             yield scrapy.Request(url, headers=headers)
 
     def parse(self, response):
-        parsed = []
+        if len(response.css("div.sc-jTzLTM.sc-ksYbfQ.kIxLfV")) != self.adController.adQuantity:
+            self.adController.canSendEmail = True
+        self.adController.adList = []
+        self.adController.adQuantity = 0
         for ad in response.css("div.sc-jTzLTM.sc-ksYbfQ.kIxLfV"):
-            parsed.append({'title': ad.css("h2.sc-ifAKCX.sc-192atix-0.kEeSeF ::text").get(), 'price': ad.css("p.sc-ifAKCX.sc-192atix-3.kebNDl ::text").get()})
+            self.adController.append({'title': ad.css("h2.sc-ifAKCX.sc-192atix-0.kEeSeF ::text").get(), 'price': ad.css("p.sc-ifAKCX.sc-192atix-3.kebNDl ::text").get()})
 
-        self.test.printParsed(parsed)
+        self.adController.printParsed()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Esse software é responsável por vigiar anúncios da OLX, dado uma palavra-chave para pesquisa")
@@ -46,17 +57,31 @@ if __name__ == "__main__":
 
     # App configuration
     controller = AdController(parse.quote(parser.parse_args().query))
-    emailController = EmailController()
     process = CrawlerProcess(settings={"LOG_ENABLED": False})
 
-    # Crawling itself
-    process.crawl(OlxScrape, testObject=controller)
-    process.start()
+    try:
+        def _crawl(result, spider, adController):
+            deferred = process.crawl(spider, adController=adController)
 
-    # Composing message
-    messageText = "Quantidade de anúncios: {}\n".format(controller.adQuantity)
-    for ad in controller.adList:
-        messageText = "{}\nAnúncio: {}\nPreço: {}\n".format(messageText, ad['title'], ad['price'])
+            # Composing message
+            def _compose():
+                if controller.canSendEmail:
+                    emailController = EmailController()
+                    messageText = "Quantidade de anúncios: {}\n".format(controller.adQuantity)
+                    for ad in controller.adList:
+                        messageText = "{}\nAnúncio: {}\nPreço: {}\n".format(messageText, ad['title'], ad['price'])
+                    emailController.write(parser.parse_args().email, parser.parse_args().password, "Relatório OLX Crawler - Termo de pesquisa: {}".format(parser.parse_args().query), messageText)
+                    emailController.send()
+                    controller.canSendEmail = False
 
-    emailController.write(parser.parse_args().email, parser.parse_args().password, "Relatório OLX Crawler - Termo de pesquisa: {}".format(parser.parse_args().query), messageText)
-    emailController.send()
+            deferred.addCallback(lambda _: _compose())
+            deferred.addCallback(lambda _: sleep(60))
+            deferred.addCallback(_crawl, spider, adController)
+            return deferred
+
+        _crawl(None, OlxScrape, controller)
+        process.start()
+
+    except KeyboardInterrupt:
+        print("OLX Crawling finalizado")
+
