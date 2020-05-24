@@ -42,10 +42,14 @@ class OlxScrape(scrapy.Spider):
     def parse(self, response):
         if len(response.css("div.sc-jTzLTM.sc-ksYbfQ.kIxLfV")) != self.adController.adQuantity:
             self.adController.canSendEmail = True
+
         self.adController.adList = []
         self.adController.adQuantity = 0
-        for ad in response.css("div.sc-jTzLTM.sc-ksYbfQ.kIxLfV"):
-            self.adController.append({'title': ad.css("h2.sc-ifAKCX.sc-192atix-0.kEeSeF ::text").get(), 'price': ad.css("p.sc-ifAKCX.sc-192atix-3.kebNDl ::text").get()})
+        #for ad in response.css("div.sc-jTzLTM.sc-ksYbfQ.kIxLfV"):
+        #    self.adController.append({'title': ad.css("h2.sc-ifAKCX.sc-192atix-0.kEeSeF ::text").get(), 'price': ad.css("p.sc-ifAKCX.sc-192atix-3.kebNDl ::text").get()})
+        for ad in response.css("ul#ad-list>li.c1zfsg-1.dcdGwU>a.sc-19i6wrj-0.lnBmvt"):
+            self.adController.append({"title": ad.css("div>div>h2 ::text").get(),"price": ad.css("div>div>p.sc-ifAKCX.sc-192atix-3.kebNDl ::text").get(),"link": ad.css("::attr(href)").extract()[0]})
+            
 
         self.adController.printParsed()
 
@@ -69,7 +73,7 @@ if __name__ == "__main__":
                     emailController = EmailController()
                     messageText = "Quantidade de anúncios: {}\n".format(controller.adQuantity)
                     for ad in controller.adList:
-                        messageText = "{}\nAnúncio: {}\nPreço: {}\n".format(messageText, ad['title'], ad['price'])
+                        messageText = "{}\nAnúncio: {}\nPreço: {}\nLink: {}\n".format(messageText, ad['title'], ad['price'], ad['link'])
                     emailController.write(parser.parse_args().email, parser.parse_args().password, "Relatório OLX Crawler - Termo de pesquisa: {}".format(parser.parse_args().query), messageText)
                     emailController.send()
                     controller.canSendEmail = False
