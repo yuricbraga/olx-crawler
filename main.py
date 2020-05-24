@@ -75,7 +75,7 @@ if __name__ == "__main__":
                     controller.canSendEmail = False
 
             deferred.addCallback(lambda _: _compose())
-            deferred.addCallback(lambda _: sleep(60))
+            deferred.addCallback(lambda _: sleep(60*15))
             deferred.addCallback(_crawl, spider, adController)
             return deferred
 
