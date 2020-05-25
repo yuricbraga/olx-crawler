@@ -47,8 +47,7 @@ class OlxScrape(scrapy.Spider):
 
         self.adController.adList = []
         self.adController.adQuantity = 0
-        #for ad in response.css("div.sc-jTzLTM.sc-ksYbfQ.kIxLfV"):
-        #    self.adController.append({'title': ad.css("h2.sc-ifAKCX.sc-192atix-0.kEeSeF ::text").get(), 'price': ad.css("p.sc-ifAKCX.sc-192atix-3.kebNDl ::text").get()})
+
         for ad in response.css("ul#ad-list>li.c1zfsg-1.dcdGwU>a.sc-19i6wrj-0.lnBmvt"):
             self.adController.append({"title": ad.css("div>div>h2 ::text").get(),"price": ad.css("div>div>p.sc-ifAKCX.sc-192atix-3.kebNDl ::text").get(),"link": ad.css("::attr(href)").extract()[0]})
             
