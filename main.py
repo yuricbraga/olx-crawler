@@ -1,3 +1,4 @@
+import os
 import scrapy
 from scrapy.crawler import CrawlerProcess, CrawlerRunner
 import argparse
@@ -10,8 +11,9 @@ from twisted.internet import reactor
 CAN_SEND_EMAIL = False
 
 class AdController:
-    def __init__(self, queryString):
+    def __init__(self, queryString, ddd):
         self.queryString = queryString
+        self.ddd = ddd
         self.adList = []
         self.adQuantity = 0
         self.canSendEmail = False
@@ -31,7 +33,7 @@ class OlxScrape(scrapy.Spider):
     def __init__(self, adController=None, *args, **kwargs):
         super(OlxScrape, self).__init__(*args, **kwargs)
         self.adController = adController
-        self.start_urls = ["https://m.olx.com.br/busca?ca=31_s&q={}&w=1".format(adController.queryString)]
+        self.start_urls = ["https://m.olx.com.br/busca?ca={}_s&q={}&w=1".format(adController.ddd, adController.queryString)]
 
 
     def start_requests(self):
@@ -58,9 +60,10 @@ if __name__ == "__main__":
     parser.add_argument("-q", action= "store", dest = "query", help="Especifica a termo de busca", required=True)
     parser.add_argument("-e", action= "store", dest = "email", help="Endereço de email do usuário", required=True)
     parser.add_argument("-p", action= "store", dest = "password", help="Senha do email do usuário", required=True)
+    parser.add_argument("-r", action= "store", dest = "region", help="DDD da região a se fazer a pesquisa", required=True)
 
     # App configuration
-    controller = AdController(parse.quote(parser.parse_args().query))
+    controller = AdController(parse.quote(parser.parse_args().query), parser.parse_args().region)
     process = CrawlerProcess(settings={"LOG_ENABLED": False})
 
     try:
