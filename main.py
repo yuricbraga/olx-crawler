@@ -3,9 +3,9 @@ from scrapy.crawler import CrawlerProcess, CrawlerRunner
 import argparse
 from urllib import parse
 from EmailController import EmailController
-from time import sleep
 from multiprocessing import Process, Queue
 from twisted.internet import reactor
+from twisted.internet.task import deferLater
 
 CAN_SEND_EMAIL = False
 
@@ -53,6 +53,10 @@ class OlxScrape(scrapy.Spider):
 
         self.adController.printParsed()
 
+def sleep(self, *args, seconds):
+    return deferLater(reactor, seconds, lambda: None)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Esse software é responsável por vigiar anúncios da OLX, dado uma palavra-chave para pesquisa")
     parser.add_argument("-q", action= "store", dest = "query", help="Especifica a termo de busca", required=True)
@@ -80,7 +84,7 @@ if __name__ == "__main__":
                     controller.canSendEmail = False
 
             deferred.addCallback(lambda _: _compose())
-            deferred.addCallback(lambda _: sleep(60*15))
+            deferred.addCallback(sleep, seconds=60*15)
             deferred.addCallback(_crawl, spider, adController)
             return deferred
 
