@@ -1,4 +1,3 @@
-import os
 import scrapy
 from scrapy.crawler import CrawlerProcess, CrawlerRunner
 import argparse
